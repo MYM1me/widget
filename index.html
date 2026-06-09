@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>케이브덕 위젯 생성기</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --surface-2: #f5f5f4;
+    --border: #e7e5e4;
+    --border-strong: #d6d3d1;
+    --text: #1c1917;
+    --text-muted: #78716c;
+    --text-faint: #a8a29e;
+    --accent: #18181b;
+    --accent-fg: #fafafa;
+    --ring: #292524;
+    --danger: #b91c1c;
+    --success: #15803d;
+  }
+  html.dark {
+    --bg: #0c0a09;
+    --surface: #18181b;
+    --surface-2: #1c1917;
+    --border: #292524;
+    --border-strong: #44403c;
+    --text: #fafaf9;
+    --text-muted: #a8a29e;
+    --text-faint: #78716c;
+    --accent: #fafaf9;
+    --accent-fg: #18181b;
+    --ring: #d6d3d1;
+    --danger: #f87171;
+    --success: #4ade80;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .surface { background: var(--surface); border-color: var(--border); }
+  .surface-2 { background: var(--surface-2); border-color: var(--border); }
+  .text-muted { color: var(--text-muted); }
+  .text-faint { color: var(--text-faint); }
+  .border-default { border-color: var(--border); }
+  .border-strong { border-color: var(--border-strong); }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    transition: opacity .15s ease, transform .05s ease;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    transition: background .15s ease;
+  }
+  .btn-ghost:hover { background: var(--surface-2); }
+  input, select, textarea {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 15%, transparent);
+  }
+  textarea { resize: vertical; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+  .display-font {
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    letter-spacing: -0.03em;
+  }
+  /* 토글 스위치 */
+  .switch {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: var(--border-strong);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background .2s ease;
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 999px;
+    transition: transform .2s ease;
+  }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { transform: translateX(16px); }
+  /* 위젯 미리보기에서 사용할 애니메이션 */
+  @keyframes fadeInUp { from { opacity:0; transform:translateY(20px);} to { opacity:1; transform:translateY(0);} }
+  @keyframes pulse { 0%,100% { opacity:1;} 50% { opacity:.5;} }
+  @keyframes spin { from { transform: rotate(0);} to { transform: rotate(360deg);} }
+  /* 스크롤바 */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+  /* 코드 블록 */
+  .code-block {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  /* 로딩 스피너 */
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  /* 상태값 행 hover */
+  .state-row { transition: background .12s ease; }
+  .state-row:hover { background: var(--surface-2); }
+  /* 토스트 */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent);
+    color: var(--accent-fg);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  /* 글자수 경고 */
+  .char-warn { color: #d97706; }
+  .char-danger { color: var(--danger); font-weight: 600; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- 헤더 -->
+<header class="border-b border-default sticky top-0 z-20" style="background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(8px);">
+  <div class="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-baseline gap-3">
+      <h1 class="display-font text-xl font-bold">위젯 생성기</h1>
+      <span class="text-xs text-faint">caveduck widget builder</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="settingsBtn" class="btn-ghost px-3 py-1.5 rounded-md text-sm">API 설정</button>
+      <button id="themeBtn" class="btn-ghost px-2.5 py-1.5 rounded-md text-sm" title="테마 전환">
+        <span id="themeIcon">🌙</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- 메인 -->
+<main class="max-w-[1400px] mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <!-- 왼쪽: 입력 -->
+  <section class="space-y-5">
+
+    <!-- 아이디어 입력 -->
+    <div class="surface border rounded-xl p-5">
+      <label class="block text-sm font-semibold mb-2">아이디어</label>
+      <p class="text-xs text-muted mb-3">어떤 위젯을 만들고 싶으세요? 장르, 색상, 분위기를 자유롭게 적어주세요.</p>
+      <textarea id="ideaInput" rows="4" class="w-full px-3 py-2.5 rounded-md text-sm" placeholder="예: 판타지 RPG 캐릭터용 위젯을 다크 골드 테마로. 현재 위치, 시간대, HP/MP, 소지금, 동료 등급을 표시."></textarea>
+
+      <div class="mt-3 pt-3 border-t border-default">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-semibold">스타일 프리셋</label>
+          <span id="presetHint" class="text-[10px] text-faint">컨셉 골격을 잡아줍니다</span>
+        </div>
+        <select id="presetSelect" class="w-full px-3 py-2 rounded-md text-sm">
+          <option value="free">자유 — AI가 아이디어 보고 알아서</option>
+          <option value="dossier">기밀문서형 — 보고서·도시에·타자기 느낌</option>
+          <option value="invitation">초대장형 — 격식 있는 카드·세리프·번호 섹션</option>
+          <option value="retro_os">레트로 OS — 윈도우·타이틀바·브라우저 메타포</option>
+          <option value="cassette">테이프형 — 미니멀 다크·모노톤·작은 장식</option>
+          <option value="hanji">전통 고서 — 한지·세로 두루마리·인장</option>
+          <option value="ios_widget">시스템 위젯 — 둥근 카드 스택·블러·시스템 폰트</option>
+          <option value="paper_polaroid">종이+카드 — 노트·포스트잇·메모지 콜라주</option>
+          <option value="terminal">터미널 — 모노폰트·ASCII 보더·CLI 미감</option>
+          <option value="storybook">동화책 — 따뜻한 페이지·손글씨·소품 모티프</option>
+          <option value="arcade">아케이드 게임 UI — 픽셀·HUD·강한 색대비</option>
+          <option value="magazine">잡지 에디토리얼 — 큰 헤드라인·그리드·여백</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 상태값 입력 -->
+    <div class="surface border rounded-xl p-5">
+      <div class="flex items-center justify-between mb-2">
+        <label class="block text-sm font-semibold">상태값</label>
+        <button id="addStateBtn" class="text-xs btn-ghost px-2.5 py-1 rounded-md">+ 추가</button>
+      </div>
+      <p class="text-xs text-muted mb-3">위젯에 표시할 정보의 이름을 적어주세요. 띄어쓰기 불가 (예: <span class="mono">캐릭터_의상</span>)</p>
+      <div id="statesList" class="space-y-2"></div>
+      <div class="mt-3 flex items-center gap-2 text-xs text-muted">
+        <button id="loadPresetBtn" class="btn-ghost px-2.5 py-1 rounded-md">기본 프리셋 불러오기</button>
+        <button id="clearStatesBtn" class="btn-ghost px-2.5 py-1 rounded-md">전체 비우기</button>
+      </div>
+    </div>
+
+    <!-- 옵션 -->
+    <div class="surface border rounded-xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <label class="text-sm font-semibold">옵션</label>
+      </div>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm">글자수 카운터</div>
+            <div class="text-xs text-muted">상태값+지시사항 합계 (3,000자 제한)</div>
+          </div>
+          <div id="counterToggle" class="switch on" data-on="true"></div>
+        </div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm">초압축 모드</div>
+            <div class="text-xs text-muted">지시사항을 200~400자로 압축</div>
+          </div>
+          <div id="compressToggle" class="switch" data-on="false"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 생성 버튼 -->
+    <button id="generateBtn" class="btn-primary w-full py-3.5 rounded-xl text-sm font-semibold">
+      위젯 생성하기
+    </button>
+
+  </section>
+
+  <!-- 오른쪽: 결과 -->
+  <section class="space-y-5">
+
+    <!-- 상태 / 미리보기 -->
+    <div class="surface border rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-default">
+        <div class="text-sm font-semibold">미리보기</div>
+        <div id="charCounter" class="text-xs text-muted mono">— / 3,000</div>
+      </div>
+      <div id="previewArea" class="p-5 min-h-[280px] flex items-center justify-center text-center">
+        <div class="text-sm text-faint">
+          왼쪽에 아이디어와 상태값을 입력하고<br/>생성 버튼을 누르면 위젯이 여기에 나타납니다.
+        </div>
+      </div>
+      <!-- 더미 데이터 편집 영역 -->
+      <div id="dummyArea" class="hidden border-t border-default px-5 py-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs font-semibold text-muted">더미 데이터 (미리보기용)</div>
+          <button id="regenDummyBtn" class="text-xs text-muted hover:underline">자동 재생성</button>
+        </div>
+        <div id="dummyList" class="grid grid-cols-2 gap-2"></div>
+      </div>
+    </div>
+
+    <!-- 결과 탭 -->
+    <div id="resultArea" class="surface border rounded-xl overflow-hidden hidden">
+      <div class="flex border-b border-default" role="tablist">
+        <button class="result-tab flex-1 px-4 py-2.5 text-sm font-medium" data-tab="html">HTML</button>
+        <button class="result-tab flex-1 px-4 py-2.5 text-sm font-medium" data-tab="states">상태값</button>
+        <button class="result-tab flex-1 px-4 py-2.5 text-sm font-medium" data-tab="instructions">지시사항</button>
+      </div>
+      <div class="relative">
+        <button id="copyBtn" class="absolute top-3 right-3 z-10 btn-ghost text-xs px-2.5 py-1 rounded-md">복사</button>
+        <pre id="resultContent" class="code-block p-5 max-h-[400px] overflow-auto"></pre>
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+<!-- API 설정 모달 -->
+<div id="settingsModal" class="fixed inset-0 z-30 hidden items-center justify-center p-4" style="background: rgba(0,0,0,0.5);">
+  <div class="surface border rounded-xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold">API 설정</h2>
+      <button id="closeSettings" class="text-muted text-xl leading-none">×</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold mb-1.5">제공자</label>
+        <select id="providerSelect" class="w-full px-3 py-2 rounded-md text-sm">
+          <option value="claude">Anthropic Claude</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+      </div>
+      <div id="claudeFields">
+        <label class="block text-xs font-semibold mb-1.5">Anthropic API Key</label>
+        <input id="claudeKey" type="password" class="w-full px-3 py-2 rounded-md text-sm mono" placeholder="sk-ant-..." />
+        <label class="block text-xs font-semibold mb-1.5 mt-3">모델</label>
+        <select id="claudeModel" class="w-full px-3 py-2 rounded-md text-sm">
+          <option value="claude-opus-4-8">Claude Opus 4.8 (최신)</option>
+          <option value="claude-opus-4-7">Claude Opus 4.7</option>
+          <option value="claude-opus-4-6">Claude Opus 4.6</option>
+          <option value="claude-sonnet-4-6" selected>Claude Sonnet 4.6 (권장)</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 (빠름)</option>
+          <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (구버전)</option>
+          <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (구버전)</option>
+        </select>
+      </div>
+      <div id="geminiFields" class="hidden">
+        <label class="block text-xs font-semibold mb-1.5">Google AI Studio API Key</label>
+        <input id="geminiKey" type="password" class="w-full px-3 py-2 rounded-md text-sm mono" placeholder="AIza..." />
+        <label class="block text-xs font-semibold mb-1.5 mt-3">모델</label>
+        <select id="geminiModel" class="w-full px-3 py-2 rounded-md text-sm">
+          <option value="gemini-2.5-pro" selected>Gemini 2.5 Pro (권장)</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        </select>
+      </div>
+
+      <div class="border-t border-default pt-4 space-y-3">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-semibold">최대 출력 토큰</label>
+            <span id="maxTokensVal" class="text-xs mono text-muted">4,096</span>
+          </div>
+          <input id="maxTokensSlider" type="range" min="512" max="32000" step="256" value="4096" class="w-full" />
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-semibold">최대 추론 토큰</label>
+            <span id="thinkBudgetVal" class="text-xs mono text-muted">사용 안 함</span>
+          </div>
+          <input id="thinkBudgetSlider" type="range" min="0" max="32000" step="512" value="0" class="w-full" />
+          <p class="text-[10px] text-faint mt-1">0이면 비활성화. 추론 토큰 지원 모델에서만 동작.</p>
+        </div>
+      </div>
+      <div class="text-xs text-muted bg-stone-100 dark:bg-stone-800 rounded-md p-3" style="background: var(--surface-2);">
+        API 키는 이 브라우저의 <span class="mono">localStorage</span>에만 저장되며 외부로 전송되지 않습니다. 요청은 사용자의 브라우저에서 직접 각 API로 전송됩니다.
+      </div>
+      <button id="saveSettings" class="btn-primary w-full py-2.5 rounded-md text-sm font-semibold">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================================================
+   상태
+============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+const DEFAULT_STATES = [
+  { name: '날짜', desc: '현재 날짜. 예: MM-DD' },
+  { name: '시간', desc: '24시간 형식. 예: HH:MM' },
+  { name: '날씨', desc: '날씨 한 단어. 예: 맑음, 비, 눈' },
+  { name: '장소', desc: '현재 장면의 장소' },
+  { name: '호감도', desc: '{{char}}→{{user}} 호감도 0-100. 이전 대비 ±5 이내' },
+  { name: '감정', desc: '{{char}}의 현재 감정 한 단어' },
+  { name: '캐릭터_의상', desc: '{{char}}의 현재 복장 전부' },
+  { name: '페르소나_의상', desc: '{{user}}의 현재 복장 전부' },
+];
+
+let states = [];          // [{name, desc}]
+let dummyValues = {};     // {상태값이름: 더미값}
+let lastResult = null;    // {html, states, instructions}
+let currentTab = 'html';
+
+const settings = {
+  provider: 'claude',
+  claudeKey: '',
+  claudeModel: 'claude-sonnet-4-6',
+  geminiKey: '',
+  geminiModel: 'gemini-2.5-pro',
+  maxTokens: 4096,
+  thinkBudget: 0,
+};
+
+/* ============================================================
+   초기화
+============================================================ */
+function init() {
+  loadSettings();
+  loadTheme();
+  loadStates();
+  renderStates();
+  updateCharCounter();
+  bindEvents();
+}
+
+/* ============================================================
+   테마
+============================================================ */
+function loadTheme() {
+  const saved = localStorage.getItem('theme');
+  const isDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.classList.toggle('dark', isDark);
+  $('#themeIcon').textContent = isDark ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  $('#themeIcon').textContent = isDark ? '☀️' : '🌙';
+}
+
+/* ============================================================
+   설정
+============================================================ */
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem('settings');
+    if (raw) Object.assign(settings, JSON.parse(raw));
+  } catch (e) {}
+  $('#providerSelect').value = settings.provider;
+  $('#claudeKey').value = settings.claudeKey;
+  $('#claudeModel').value = settings.claudeModel;
+  $('#geminiKey').value = settings.geminiKey;
+  $('#geminiModel').value = settings.geminiModel;
+  $('#maxTokensSlider').value = settings.maxTokens;
+  $('#thinkBudgetSlider').value = settings.thinkBudget;
+  updateTokenLabels();
+  updateProviderUI();
+}
+function updateTokenLabels() {
+  const mt = parseInt($('#maxTokensSlider').value);
+  $('#maxTokensVal').textContent = mt.toLocaleString();
+  const tb = parseInt($('#thinkBudgetSlider').value);
+  $('#thinkBudgetVal').textContent = tb === 0 ? '사용 안 함' : tb.toLocaleString();
+}
+function saveSettings() {
+  settings.provider = $('#providerSelect').value;
+  settings.claudeKey = $('#claudeKey').value.trim();
+  settings.claudeModel = $('#claudeModel').value;
+  settings.geminiKey = $('#geminiKey').value.trim();
+  settings.geminiModel = $('#geminiModel').value;
+  settings.maxTokens = parseInt($('#maxTokensSlider').value);
+  settings.thinkBudget = parseInt($('#thinkBudgetSlider').value);
+  localStorage.setItem('settings', JSON.stringify(settings));
+  $('#settingsModal').classList.remove('flex');
+  $('#settingsModal').classList.add('hidden');
+  toast('설정이 저장되었어요');
+}
+function updateProviderUI() {
+  const p = $('#providerSelect').value;
+  $('#claudeFields').classList.toggle('hidden', p !== 'claude');
+  $('#geminiFields').classList.toggle('hidden', p !== 'gemini');
+}
+
+/* ============================================================
+   상태값 관리
+============================================================ */
+function loadStates() {
+  try {
+    const raw = localStorage.getItem('states');
+    if (raw) {
+      states = JSON.parse(raw);
+      return;
+    }
+  } catch (e) {}
+  states = JSON.parse(JSON.stringify(DEFAULT_STATES));
+}
+function persistStates() {
+  localStorage.setItem('states', JSON.stringify(states));
+}
+function renderStates() {
+  const list = $('#statesList');
+  list.innerHTML = '';
+  states.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'state-row border border-default rounded-md p-2.5 flex gap-2';
+    row.innerHTML = `
+      <div class="flex-1 space-y-1.5">
+        <input type="text" data-i="${i}" data-k="name" value="${escapeAttr(s.name)}"
+               class="w-full px-2 py-1 rounded text-xs font-semibold mono"
+               placeholder="상태값_이름" />
+        <input type="text" data-i="${i}" data-k="desc" value="${escapeAttr(s.desc)}"
+               class="w-full px-2 py-1 rounded text-xs"
+               placeholder="지시사항 (예: 날짜. MM-DD)" />
+      </div>
+      <button data-rm="${i}" class="text-faint hover:text-red-500 text-lg leading-none px-1 self-start">×</button>
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', (e) => {
+      const i = +e.target.dataset.i;
+      const k = e.target.dataset.k;
+      states[i][k] = e.target.value;
+      persistStates();
+      updateCharCounter();
+    });
+  });
+  list.querySelectorAll('[data-rm]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const i = +e.target.dataset.rm;
+      states.splice(i, 1);
+      persistStates();
+      renderStates();
+      updateCharCounter();
+    });
+  });
+}
+function addState() {
+  states.push({ name: '', desc: '' });
+  persistStates();
+  renderStates();
+}
+
+/* ============================================================
+   글자수 카운터
+============================================================ */
+function calcCharCount() {
+  let total = 0;
+  states.forEach(s => {
+    total += (s.name || '').length + (s.desc || '').length;
+  });
+  return total;
+}
+function updateCharCounter() {
+  const counter = $('#charCounter');
+  const on = $('#counterToggle').dataset.on === 'true';
+  if (!on) {
+    counter.textContent = '';
+    counter.classList.add('hidden');
+    return;
+  }
+  counter.classList.remove('hidden');
+  const total = calcCharCount();
+  counter.textContent = `${total.toLocaleString()} / 3,000`;
+  counter.classList.remove('char-warn', 'char-danger', 'text-muted');
+  if (total > 3000) counter.classList.add('char-danger');
+  else if (total > 2400) counter.classList.add('char-warn');
+  else counter.classList.add('text-muted');
+}
+
+/* ============================================================
+   더미 데이터
+============================================================ */
+function autoGenerateDummy(name) {
+  const n = name.toLowerCase();
+  if (/날짜|date/.test(n)) return new Date().toISOString().slice(5, 10);
+  if (/시간|time/.test(n)) { const d = new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+  if (/날씨|weather/.test(n)) return ['맑음','흐림','비','눈'][Math.floor(Math.random()*4)];
+  if (/호감도|친밀도|affection|favor/.test(n)) return String(60 + Math.floor(Math.random()*30));
+  if (/hp|체력/.test(n)) return String(70 + Math.floor(Math.random()*30));
+  if (/mp|마나/.test(n)) return String(40 + Math.floor(Math.random()*40));
+  if (/감정|mood|emotion/.test(n)) return ['평온','설렘','긴장','기쁨','무덤덤'][Math.floor(Math.random()*5)];
+  if (/장소|위치|location|place/.test(n)) return '교실 창가';
+  if (/관계|relation/.test(n)) return '친구';
+  if (/소지금|돈|gold|money/.test(n)) return '1,200골드';
+  if (/요일|day/.test(n)) return '수요일';
+  if (/교시|period/.test(n)) return '3교시';
+  if (/등급|rank|grade/.test(n)) return 'B';
+  if (/의상|복장|outfit|clothes/.test(n)) {
+    if (/캐릭터|char/.test(n)) return '검은색 셔츠, 회색 슬랙스';
+    if (/페르소나|user|내/.test(n)) return '흰 티셔츠, 청바지';
+    return '캐주얼 복장';
+  }
+  if (/이름|name/.test(n)) return '하루';
+  if (/성별|gender/.test(n)) return '여성';
+  if (/나이|age/.test(n)) return '17';
+  return '예시값';
+}
+function refreshDummy({ keepUser = true } = {}) {
+  const fresh = {};
+  states.forEach(s => {
+    if (!s.name) return;
+    if (keepUser && dummyValues[s.name] !== undefined) {
+      fresh[s.name] = dummyValues[s.name];
+    } else {
+      fresh[s.name] = autoGenerateDummy(s.name);
+    }
+  });
+  dummyValues = fresh;
+}
+function renderDummyEditor() {
+  const wrap = $('#dummyList');
+  wrap.innerHTML = '';
+  Object.keys(dummyValues).forEach(name => {
+    const cell = document.createElement('div');
+    cell.className = 'flex flex-col gap-1';
+    cell.innerHTML = `
+      <label class="text-[10px] mono text-faint">{{${escapeAttr(name)}}}</label>
+      <input type="text" data-dummy="${escapeAttr(name)}" value="${escapeAttr(dummyValues[name])}"
+             class="px-2 py-1 rounded text-xs" />
+    `;
+    wrap.appendChild(cell);
+  });
+  wrap.querySelectorAll('input[data-dummy]').forEach(inp => {
+    inp.addEventListener('input', (e) => {
+      dummyValues[e.target.dataset.dummy] = e.target.value;
+      renderPreview();
+    });
+  });
+}
+
+/* ============================================================
+   미리보기 렌더링
+============================================================ */
+function renderPreview() {
+  if (!lastResult) return;
+  let html = lastResult.html;
+  Object.keys(dummyValues).forEach(name => {
+    const re = new RegExp(`\\{\\{\\s*${escapeRegex(name)}\\s*\\}\\}`, 'g');
+    html = html.replace(re, escapeHtml(dummyValues[name]));
+  });
+  // {{char}}, {{user}} 같은 미해결 변수 처리
+  html = html.replace(/\{\{\s*char\s*\}\}/gi, '캐릭터');
+  html = html.replace(/\{\{\s*user\s*\}\}/gi, '나');
+  $('#previewArea').innerHTML = html;
+}
+
+/* ============================================================
+   생성 - 시스템 프롬프트
+============================================================ */
+const PRESET_BRIEFS = {
+  free: ``,
+  dossier: `**컨셉 카테고리**: 기밀문서/도시에/보고서 계열.
+방향성: 케이스 파일, 인덱스 번호(§ 01, § 02...), 모노스페이스 라벨, 분류 도장, 흐릿한 종이결, 클래시파이드 헤더.
+이 카테고리의 핵심은: 헤더에 "문서 메타데이터" 영역(파일 번호·분류 등급·날짜)이 있고, 본문은 섹션별로 번호가 매겨지며, 라벨이 작고 대문자/모노스페이스로 처리됨.
+모방하지 말고 사용자 아이디어와 결합해 새로운 도시에를 만들 것.`,
+  invitation: `**컨셉 카테고리**: 격식 있는 초대장/공식 문서.
+방향성: 세리프 디스플레이 폰트, 중앙 정렬 헤더, 부제·번호·작은 캡션의 위계가 분명, 절제된 골드/네이비/크림 같은 클래식 팔레트(*같은*이지 같은 색 쓰란 게 아님), 페이지 가장자리 장식선.
+핵심은: "제 N호", "DATE / HOUR / SEASON" 같은 격식 있는 라벨링, 손님 명단 카드 같은 별도 강조 박스, 푸터에 가문·서명 같은 마무리.
+사용자 세계관에 맞는 격식체로 변주할 것.`,
+  retro_os: `**컨셉 카테고리**: 90년대/2000년대 OS 윈도우, 브라우저, 메신저 UI 메타포.
+방향성: 타이틀바(닫기/최소화 버튼 *모양*만 - 실제 button 태그 금지, div로 흉내), 주소창, 탭, 인셋/아웃셋 보더 느낌, 시스템 폰트.
+핵심은: 위젯 전체가 "어떤 프로그램의 창"처럼 보이게. 어떤 OS인지(맥/윈도우/리눅스/가상 OS)와 어떤 앱(브라우저/일기장/메신저/파일탐색기)인지를 정해서 일관성 있게.`,
+  cassette: `**컨셉 카테고리**: 카세트테이프/믹스테이프/오디오 장비 미감.
+방향성: 매우 다크한 배경, 미니멀, 작은 다이아·별·도트 같은 장식 모티프가 일정한 간격으로 배치, 트랙 리스트 같은 항목 나열, "SIDE A / SIDE B", "NOW PLAYING" 같은 카피.
+핵심은: 큰 색대비보다 *질감*과 *간격*으로 컨셉을 만든다. 진행바, 작은 원형 아이콘(릴), 모노 폰트의 라벨.`,
+  hanji: `**컨셉 카테고리**: 한국 전통 고서/두루마리/한자 미감.
+방향성: 베이지·먹·진주황(인장) 팔레트(*같은*), 세로쓰기 영역, 한자 장식(예: 章 卷 第 등), 인장 도장, 종이 결.
+핵심은: 두루마리 펼친 듯한 세로 정렬 영역과 가로 정렬 영역의 조합, 격식 있는 한국어 라벨링(첫째 줄, 둘째 줄...), 붉은 인장 같은 시그니처 강조.`,
+  ios_widget: `**컨셉 카테고리**: iOS 잠금화면/홈화면 위젯 스택.
+방향성: 큰 라운드(rounded-2xl/3xl), 부드러운 그라데이션 배경, 시스템 폰트 굵기 위계(작은 라벨 + 큰 값), 위젯 카드 간 일정한 간격, 작은 SF Symbols 풍 이모지.
+핵심은: 위젯 한 덩어리가 아니라 *여러 카드의 스택*으로 구성. 각 카드는 자기 역할이 있고(목표/약속/알림/관계), 카드끼리는 시각 언어가 통일됨.`,
+  paper_polaroid: `**컨셉 카테고리**: 종이 노트 + 포스트잇 + 폴라로이드 콜라주.
+방향성: 따뜻한 크림/베이지 배경에 노란 형광펜, 마스킹테이프(가짜로 div의 transform: rotate로 비스듬히), 손글씨 같지 않되 친근한 폰트 위계, 신분증 카드 같은 별도 강조 요소.
+핵심은: 모든 요소가 *손으로 붙인 듯한 비정형*. 살짝 기울어진 카드, 도장처럼 찍힌 라벨, 격자 노트 배경.`,
+  terminal: `**컨셉 카테고리**: 터미널/CLI/모노폰트 미감.
+방향성: 거의 모든 텍스트가 모노스페이스, ASCII 보더(─ │ ┌ ┐ └ ┘ ╭ ╮ ╰ ╯), 한 가지 강한 액센트 색(초록/앰버/시안 중 하나), "$ ", "> ", "[ OK ]" 같은 프롬프트 표기.
+핵심은: 텍스트 정렬과 보더 문자로만 구조를 만든다. 박스 보더보다 ASCII 라인이 우선.`,
+  storybook: `**컨셉 카테고리**: 동화책/그림책 페이지.
+방향성: 따뜻한 파스텔 또는 부드러운 채도 팔레트, 둥근 곡선, 큰 라운드, 손으로 그린 듯한 작은 장식(꽃·별·하트 - 이모지로), 챕터 헤더처럼 큰 디스플레이 글자.
+핵심은: 위젯이 "현재 페이지"라는 감각. 페이지 번호, 챕터 표제, 따옴표 인용처럼 처리된 대사 영역.`,
+  arcade: `**컨셉 카테고리**: 8/16비트 게임 HUD, 아케이드.
+방향성: 강한 색대비(네온·블랙·핫핑크·시안), 픽셀 폰트 느낌(모노스페이스 + 대문자 + 자간), HP/MP 바 같은 게임 UI, 모서리에 작은 픽셀 장식.
+핵심은: 정보를 게임 UI로 본다. "STATUS / EQUIP / QUEST" 같은 라벨, 진행도 바를 픽셀 블록 분할로 표현, 코너 마커.`,
+  magazine: `**컨셉 카테고리**: 잡지 에디토리얼 레이아웃.
+방향성: 크고 표현력 강한 세리프 헤드라인, 본문은 작은 산세리프, 풍부한 여백, 굵은 가로 디바이더, 호 번호/이슈 표기, 아주 절제된 색.
+핵심은: 정보가 *기사처럼* 위계를 가진다. 제목·드롭캡·캡션·풋노트. 위젯이 한 페이지의 매거진 스프레드 같음.`,
+};
+
+function buildSystemPrompt(compressed, presetKey) {
+  const preset = PRESET_BRIEFS[presetKey] || '';
+  return `너는 케이브덕(caveduck) 채팅 플랫폼의 **위젯 디자인 디렉터**다. 사용자가 제시한 아이디어·상태값·스타일 방향을 받아서, 컨셉이 또렷한 위젯을 **JSON 한 덩어리**로 생성한다.
+
+# 위젯이란
+케이브덕 채팅창에 상태 정보(날짜, 호감도, 위치, 의상 등)를 시각적으로 표시하는 UI 컴포넌트. 3가지 영역:
+1. **상태값(name)**: 표시할 정보의 이름 (글자수 포함)
+2. **지시사항(instruction)**: 각 상태값의 출력 기준과 형식 (글자수 포함)
+3. **위젯 콘텐츠(html)**: 실제 렌더링되는 HTML (글자수 미포함)
+
+상태값 + 지시사항 합계는 **3,000자 이내**.
+
+# 출력 형식 (이 JSON 구조 그대로, 외부 텍스트 일체 금지)
+\`\`\`json
+{
+  "html": "위젯 HTML 코드",
+  "states": [
+    { "name": "상태값이름", "instruction": "지시사항" }
+  ]
+}
+\`\`\`
+JSON 외부에 인사·설명·백틱이 있으면 파싱 실패한다.
+
+# 디자인 디렉션 — 가장 중요
+
+## 절대 하지 말 것 (AI가 자주 빠지는 함정)
+다음은 "위젯 만들어줘"라는 요청을 받은 AI가 디폴트로 토해내는 진부한 패턴이다. **이걸 그대로 내면 실패한 디자인이다.**
+- ❌ 단일 색 배경(#09090b 또는 비슷한 zinc-900)에 둥근 모서리 + 보더 한 줄짜리 카드
+- ❌ "이모지 + 작은 회색 라벨 + 값"이 3열 grid로 나열된 헤더
+- ❌ \`border-zinc-800\`, \`text-zinc-500\`, \`bg-zinc-900/30\` 같은 무난한 회색조 일색
+- ❌ 컨셉 없는 "Status / Profile / Info" 같은 영문 라벨 막 박기
+- ❌ 호감도 프로그레스바를 분홍색으로 칠하고 끝
+- ❌ 모든 정보를 똑같은 크기·굵기로 평평하게 나열 (위계 없음)
+- ❌ 장식 요소가 이모지 1~2개로 끝남
+- ❌ 그라데이션 한 번 깔고 "고급스러움" 다 했다고 생각하기
+
+## 반드시 할 것
+1. **시각 메타포부터 정한다.**
+   위젯이 무엇처럼 *보여야* 하는지 먼저 결정. "기밀문서다", "오래된 일기장이다", "RPG 인벤토리 창이다", "신문 1면이다", "초대장이다" 등. 사용자 아이디어에서 *세계관의 사물·재료·표지·표식*을 끌어내서 그 사물의 시각언어로 위젯을 만든다.
+
+2. **3~5색 팔레트를 의식적으로 설계.**
+   배경/표면/주조 텍스트/보조 텍스트/액센트(1~2개). 회색 톤만 쓰지 말 것. 컨셉의 세계관에서 끌어온 색을 쓸 것 (예: 도시에 → 크림·잉크블랙·붉은 도장 / 무도회 → 네이비·골드·크림 / 학원물 → 노트노란색·교복네이비·형광색).
+
+3. **타이포 위계가 보이게.**
+   라벨(작고 자간 넓은 대문자/한글) vs 값(크고 굵은) vs 부연(중간 회색)이 *명확하게* 다르게 보이도록. 같은 화면에 폰트 크기 3~4단계 이상 사용. 자간(letter-spacing)도 라벨엔 넓게, 값엔 좁게.
+
+4. **구조적 장치가 정보를 담게.**
+   섹션 번호(§ 01, № 1, Chapter Ⅰ 등)·인덱스·헤더·구분선이 그냥 장식이 아니라 *컨셉의 일부*가 되도록. 사용한다면 진짜로 의미 있는 순서/카테고리에만 쓸 것.
+
+5. **시그니처 요소 하나에 집중.**
+   기억에 남는 요소 한 가지(도장 모양, 카세트 휠, 두루마리 끝장식, 픽셀 코너, 마스킹테이프 등)를 정하고 거기에 디테일을 쏟을 것. 나머지는 조용히. *모든 요소가 다 화려하면 아무것도 안 보인다.*
+
+6. **공간감과 디테일.**
+   여백·구분선·작은 캡션·미세한 배경 패턴·살짝 다른 톤의 서브 배경 같은 *작은 차이*들로 깊이를 만든다. 평평한 박스 나열 금지.
+
+## 참고 — 직접 모방은 금지
+아래는 *디테일 밀도와 컨셉 일관성*의 기준 예시다. **이 예시들을 시각적으로 따라하면 안 된다.** 어디까지 정성을 들여야 하는지 감을 잡기 위한 참고일 뿐.
+- 어떤 위젯은 위쪽에 무도회 초대장의 헤더("EDELGARDT · 제 N호 · ▽")가 있고, 그 아래 좌석표처럼 배치된 캐릭터 카드 3장, 그 아래 § 01~§ 05 섹션, 푸터에 가문명이 들어간다.
+- 어떤 위젯은 "TOP SECRET · EYES ONLY · FILE NO. 0451"의 헤더에 CLASSIFIED 도장이 비스듬히 찍혀 있고, 본문은 § 01~§ 07 섹션 목록이며, 푸터는 "END OF FILE · DESTROY AFTER READING"이다.
+- 어떤 위젯은 카세트테이프 두 릴이 위에 있고 그 사이로 진행바가 흐르며, 아래엔 "SIDE A — NPC", "SIDE B — PC", "PROMISE", "SCHEDULE" 같은 트랙 리스트가 펼쳐진다.
+
+→ **너의 임무는 사용자 아이디어에 가장 어울리는 새로운 메타포를 발명하는 것.** 위 예시를 베끼지 말 것.
+
+${preset ? `\n# 이번 작업의 스타일 방향\n${preset}\n` : `\n# 이번 작업의 스타일 방향\n사용자가 '자유' 프리셋을 선택. 아이디어 텍스트에서 직접 메타포를 추출해서 디자인할 것. 보편적/안전한 선택보다 *사용자 세계관에 충실한 한 가지 컨셉*에 베팅할 것.\n`}
+
+# 상태값(name) 규칙
+- 띄어쓰기 금지 → \`캐릭터_의상\` ✅ / \`캐릭터 의상\` ❌
+- 의미 명확한 이름만 (\`값A\`, \`이름1\` 금지)
+- HTML 안에서 \`{{상태값이름}}\` 형식으로 바인딩
+- **사용자가 입력한 상태값 이름은 그대로 유지.** 임의로 추가/삭제/이름변경 금지. (지시사항은 다듬어도 됨.)
+- 사용자가 상태값을 안 줬다면 아이디어에 맞춰 합리적으로 6~10개 제안.
+
+# 지시사항(instruction) 규칙
+${compressed
+  ? `- **초압축 모드**: 음슴체, 조사 생략, 출력 예시는 \`예:\` 로. 한 상태값 한 줄.
+- 예: \`{{char}}→{{user}} 호감도 0-100. 이전 대비 ±5 이내. 예: 72\`
+- 목표: 상태값+지시사항 합계 200~400자.`
+  : `- 명확하되 간결하게. AI가 일관된 형식으로 출력하도록 출력 예시 포함.
+- 예: \`{{char}}가 {{user}}에게 느끼는 호감도. 0-100. 예: 72\`
+- 합계 3,000자 이내 (가능한 짧게).`}
+
+# HTML(html) 기술 규칙
+**사용 가능**: TailwindCSS 클래스, 인라인 \`style\`, 이모지/유니코드 (다양하게 활용 — 📅 🕒 ☁️ 📍 ◆ ◇ ✦ ✧ ※ § № ¶ ⁂ ─ │ ┌ ┐ └ ┘ ╭ ╮ ╰ ╯ ▲ ▽ ◯ ● 등)
+
+**절대 금지 태그**: \`script\`, \`iframe\`, \`svg\`, \`img\`, \`a\`, \`form\`, \`input\`, \`textarea\`, \`select\`, \`button\`, \`object\`, \`embed\`, \`math\`, \`style\`, \`link\`, \`meta\`, \`base\`, \`applet\`
+
+**스타일링**:
+- \`<style>\` 태그 금지. 모든 스타일은 인라인 \`style\` 또는 Tailwind 클래스.
+- 글자색과 배경색 **명확한 대비**. 흐릿한 회색-회색 조합 금지.
+- 폰트 권장: 본문 \`'Pretendard Variable', Pretendard, -apple-system, sans-serif\`, 모노 필요 시 \`'JetBrains Mono', ui-monospace, monospace\`, 세리프 필요 시 \`Georgia, 'Times New Roman', serif\`.
+- \`-webkit-font-smoothing: antialiased\` 권장.
+- transform(rotate/translate), 인라인 SVG 못 쓰는 대신 유니코드 도형 활용. 비스듬한 효과는 \`style="transform: rotate(-3deg)"\` 같은 식으로 div에 적용 가능.
+
+**바인딩**: 상태값은 \`{{상태값이름}}\` 형식. 동적 너비도 가능 → \`style="width:{{호감도}}%"\`
+
+**이미지 금지**: \`img\` 태그·외부 이미지 URL 일절 금지. 시각 요소는 이모지·유니코드·CSS·그라데이션·보더·divider만으로.
+
+**애니메이션** (필요 시 인라인 \`style\`의 \`animation\` 속성으로): fadeInUp, fadeInDown, fadeInLeft, fadeInRight, zoomIn, bounceIn, pulse, heartBeat, shakeX, slideIn 계열, fadeIn, spin, loading 등. **남발 금지** — 시그니처 한 곳에만.
+
+# 자가 검증 (출력 직전)
+- [ ] JSON 외 텍스트 없음 (백틱·인사 포함)
+- [ ] 사용자가 준 상태값 이름이 그대로 \`states\`와 HTML \`{{이름}}\`에 일치
+- [ ] 금지 태그 없음, \`<style>\` 없음, \`img\` 없음
+- [ ] 글자색-배경색 대비 충분
+- [ ] 위에서 정한 "절대 하지 말 것"에 해당하는 진부 패턴이 없는지 다시 보기
+- [ ] 시각 메타포가 분명한가? 위젯을 한 단어로 묘사할 수 있는가?
+- [ ] 시그니처 요소가 하나 있는가?
+- [ ] 타이포 위계가 3단계 이상 보이는가?
+- [ ] 합계 3,000자 이내`;
+}
+
+function buildUserMessage(idea, stateList, presetKey) {
+  const stateLines = stateList
+    .filter(s => s.name && s.name.trim())
+    .map(s => `- ${s.name}${s.desc ? ` (${s.desc})` : ''}`)
+    .join('\n');
+  return `## 아이디어
+${idea || '(아이디어 미입력 — 스타일 프리셋과 상태값만 보고 위젯 컨셉을 직접 발명할 것)'}
+
+## 사용할 상태값
+${stateLines || '(상태값 미입력 — 아이디어/프리셋에 맞춰 6~10개 합리적으로 제안)'}
+
+## 선택한 스타일 프리셋
+${presetKey === 'free' ? '자유' : presetKey}
+
+위 정보를 바탕으로 컨셉이 또렷한 위젯을 만들어줘. **시각 메타포를 먼저 정하고** 거기서부터 색·타이포·구조·시그니처를 끌어낼 것. 진부 패턴 회피. JSON만 출력.`;
+}
+
+/* ============================================================
+   API 호출
+============================================================ */
+async function callClaude(systemPrompt, userMessage) {
+  const body = {
+    model: settings.claudeModel,
+    max_tokens: settings.maxTokens,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }],
+  };
+  // 추론 토큰 적용
+  if (settings.thinkBudget > 0) {
+    if (settings.claudeModel === 'claude-opus-4-8') {
+      // opus-4-8은 adaptive thinking + effort 사용
+      body.thinking = { type: 'adaptive' };
+      const ratio = settings.thinkBudget / Math.max(settings.maxTokens, 1);
+      body.output_config = {
+        effort: ratio < 0.25 ? 'low' : ratio < 0.6 ? 'medium' : 'high',
+      };
+    } else {
+      body.thinking = { type: 'enabled', budget_tokens: settings.thinkBudget };
+    }
+  }
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': settings.claudeKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Claude API ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  return data.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+}
+
+async function callGemini(systemPrompt, userMessage) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${settings.geminiModel}:generateContent?key=${encodeURIComponent(settings.geminiKey)}`;
+  const generationConfig = {
+    temperature: 0.7,
+    maxOutputTokens: settings.maxTokens,
+    responseMimeType: 'application/json',
+  };
+  if (settings.thinkBudget > 0) {
+    generationConfig.thinkingConfig = { thinkingBudget: settings.thinkBudget };
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      generationConfig,
+    }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Gemini API ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  return parts.map(p => p.text || '').join('\n');
+}
+
+function parseAIResponse(text) {
+  // 백틱 코드블록 제거
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  // 첫 { 부터 마지막 } 까지
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('JSON 형식을 찾을 수 없어요');
+  const jsonStr = cleaned.slice(start, end + 1);
+  const obj = JSON.parse(jsonStr);
+  if (!obj.html || !Array.isArray(obj.states)) {
+    throw new Error('응답 구조가 올바르지 않아요 (html, states 누락)');
+  }
+  return obj;
+}
+
+/* ============================================================
+   생성 플로우
+============================================================ */
+async function generate() {
+  const idea = $('#ideaInput').value.trim();
+  const validStates = states.filter(s => s.name && s.name.trim());
+  if (!idea && validStates.length === 0) {
+    toast('아이디어나 상태값을 입력해주세요');
+    return;
+  }
+  const key = settings.provider === 'claude' ? settings.claudeKey : settings.geminiKey;
+  if (!key) {
+    toast('우측 상단 "API 설정"에서 키를 먼저 입력해주세요');
+    $('#settingsModal').classList.remove('hidden');
+    $('#settingsModal').classList.add('flex');
+    return;
+  }
+
+  const btn = $('#generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner mr-2"></span>생성 중...';
+  $('#previewArea').innerHTML = '<div class="text-sm text-faint">AI가 위젯을 만드는 중이에요...</div>';
+
+  try {
+    const compressed = $('#compressToggle').dataset.on === 'true';
+    const presetKey = $('#presetSelect').value;
+    const systemPrompt = buildSystemPrompt(compressed, presetKey);
+    const userMessage = buildUserMessage(idea, states, presetKey);
+
+    const raw = settings.provider === 'claude'
+      ? await callClaude(systemPrompt, userMessage)
+      : await callGemini(systemPrompt, userMessage);
+
+    const parsed = parseAIResponse(raw);
+
+    // 상태값 동기화 (AI가 약간 다듬은 지시사항을 입력 폼에도 반영)
+    const newStates = parsed.states.map(s => ({
+      name: (s.name || '').trim(),
+      desc: (s.instruction || '').trim(),
+    }));
+    states = newStates;
+    persistStates();
+    renderStates();
+    updateCharCounter();
+
+    lastResult = {
+      html: parsed.html,
+      states: newStates,
+      instructions: newStates,
+    };
+
+    refreshDummy({ keepUser: false });
+    renderDummyEditor();
+    renderPreview();
+    $('#dummyArea').classList.remove('hidden');
+    $('#resultArea').classList.remove('hidden');
+    setTab('html');
+    toast('위젯이 생성되었어요');
+  } catch (e) {
+    console.error(e);
+    $('#previewArea').innerHTML = `<div class="text-sm" style="color: var(--danger)">생성 실패: ${escapeHtml(e.message)}</div>`;
+    toast('생성에 실패했어요');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '위젯 생성하기';
+  }
+}
+
+/* ============================================================
+   결과 탭
+============================================================ */
+function setTab(name) {
+  currentTab = name;
+  $$('.result-tab').forEach(b => {
+    const active = b.dataset.tab === name;
+    b.style.color = active ? 'var(--text)' : 'var(--text-muted)';
+    b.style.background = active ? 'var(--surface-2)' : 'transparent';
+    b.style.fontWeight = active ? '600' : '500';
+  });
+  if (!lastResult) return;
+  let content = '';
+  if (name === 'html') {
+    content = lastResult.html;
+  } else if (name === 'states') {
+    content = lastResult.states.map(s => s.name).join('\n');
+  } else if (name === 'instructions') {
+    content = lastResult.states.map(s => `[${s.name}]\n${s.desc}`).join('\n\n');
+  }
+  $('#resultContent').textContent = content;
+}
+
+async function copyResult() {
+  if (!lastResult) return;
+  const text = $('#resultContent').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('복사되었어요');
+  } catch (e) {
+    toast('복사 실패');
+  }
+}
+
+/* ============================================================
+   유틸
+============================================================ */
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+function escapeRegex(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ============================================================
+   이벤트 바인딩
+============================================================ */
+function bindEvents() {
+  $('#themeBtn').addEventListener('click', toggleTheme);
+  $('#settingsBtn').addEventListener('click', () => {
+    $('#settingsModal').classList.remove('hidden');
+    $('#settingsModal').classList.add('flex');
+  });
+  $('#closeSettings').addEventListener('click', () => {
+    $('#settingsModal').classList.add('hidden');
+    $('#settingsModal').classList.remove('flex');
+  });
+  $('#settingsModal').addEventListener('click', (e) => {
+    if (e.target.id === 'settingsModal') {
+      $('#settingsModal').classList.add('hidden');
+      $('#settingsModal').classList.remove('flex');
+    }
+  });
+  $('#providerSelect').addEventListener('change', updateProviderUI);
+  $('#saveSettings').addEventListener('click', saveSettings);
+  $('#maxTokensSlider').addEventListener('input', updateTokenLabels);
+  $('#thinkBudgetSlider').addEventListener('input', updateTokenLabels);
+
+  $('#addStateBtn').addEventListener('click', addState);
+  $('#loadPresetBtn').addEventListener('click', () => {
+    states = JSON.parse(JSON.stringify(DEFAULT_STATES));
+    persistStates();
+    renderStates();
+    updateCharCounter();
+  });
+  $('#clearStatesBtn').addEventListener('click', () => {
+    states = [];
+    persistStates();
+    renderStates();
+    updateCharCounter();
+  });
+
+  // 토글
+  [$('#counterToggle'), $('#compressToggle')].forEach(el => {
+    el.addEventListener('click', () => {
+      const on = el.dataset.on === 'true';
+      el.dataset.on = on ? 'false' : 'true';
+      el.classList.toggle('on', !on);
+      if (el.id === 'counterToggle') updateCharCounter();
+    });
+  });
+
+  $('#generateBtn').addEventListener('click', generate);
+
+  // 프리셋 저장/복원
+  const savedPreset = localStorage.getItem('lastPreset');
+  if (savedPreset) $('#presetSelect').value = savedPreset;
+  $('#presetSelect').addEventListener('change', (e) => {
+    localStorage.setItem('lastPreset', e.target.value);
+  });
+
+  // 결과 탭
+  $$('.result-tab').forEach(b => {
+    b.addEventListener('click', () => setTab(b.dataset.tab));
+  });
+  $('#copyBtn').addEventListener('click', copyResult);
+
+  // 더미 데이터 재생성
+  $('#regenDummyBtn').addEventListener('click', () => {
+    refreshDummy({ keepUser: false });
+    renderDummyEditor();
+    renderPreview();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
