@@ -873,17 +873,57 @@ async function callGemini(systemPrompt, userMessage) {
 }
 
 function parseAIResponse(text) {
-  // 백틱 코드블록 제거
+  // 1. 백틱 코드블록 제거
   let cleaned = text.trim();
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-  // 첫 { 부터 마지막 } 까지
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+
+  // 2. 첫 { 부터 균형 맞는 } 까지만 추출 (문자열/이스케이프 인식)
   const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
-  if (start === -1 || end === -1) throw new Error('JSON 형식을 찾을 수 없어요');
+  if (start === -1) {
+    const err = new Error('JSON 객체를 찾을 수 없어요. AI가 JSON이 아닌 응답을 보냈을 수 있어요.');
+    err.raw = text;
+    throw err;
+  }
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let end = -1;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\') { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end === -1) {
+    const err = new Error('JSON이 잘렸어요. 최대 출력 토큰을 늘려보세요.');
+    err.raw = text;
+    throw err;
+  }
   const jsonStr = cleaned.slice(start, end + 1);
-  const obj = JSON.parse(jsonStr);
+
+  // 3. 파싱
+  let obj;
+  try {
+    obj = JSON.parse(jsonStr);
+  } catch (e) {
+    const err = new Error(`JSON 파싱 실패: ${e.message}`);
+    err.raw = text;
+    err.extracted = jsonStr;
+    throw err;
+  }
+
+  // 4. 구조 검증
   if (!obj.html || !Array.isArray(obj.states)) {
-    throw new Error('응답 구조가 올바르지 않아요 (html, states 누락)');
+    const err = new Error('응답 구조가 올바르지 않아요 (html, states 누락)');
+    err.raw = text;
+    err.parsed = obj;
+    throw err;
   }
   return obj;
 }
@@ -948,7 +988,21 @@ async function generate() {
     toast('위젯이 생성되었어요');
   } catch (e) {
     console.error(e);
-    $('#previewArea').innerHTML = `<div class="text-sm" style="color: var(--danger)">생성 실패: ${escapeHtml(e.message)}</div>`;
+    let detail = '';
+    if (e.raw) {
+      const rawPreview = String(e.raw).slice(0, 2000);
+      detail = `
+        <details class="mt-3 text-left">
+          <summary class="text-xs text-muted cursor-pointer hover:underline">AI 원본 응답 보기 (디버깅)</summary>
+          <pre class="mt-2 p-3 rounded text-[10px] mono whitespace-pre-wrap break-all max-h-[300px] overflow-auto" style="background:var(--surface-2); color:var(--text-muted)">${escapeHtml(rawPreview)}${e.raw.length > 2000 ? '\n\n...(이하 생략)' : ''}</pre>
+        </details>`;
+    }
+    $('#previewArea').innerHTML = `
+      <div class="text-sm w-full" style="color: var(--danger)">
+        <div class="font-semibold mb-1">생성 실패</div>
+        <div class="text-xs">${escapeHtml(e.message)}</div>
+        ${detail}
+      </div>`;
     toast('생성에 실패했어요');
   } finally {
     btn.disabled = false;
